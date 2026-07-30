@@ -33,7 +33,7 @@
   main { padding: 16px; max-width: 640px; margin: 0 auto; }
   .card { background: #fff; border: 1px solid #DEDEDE; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
   label { font-size: 12px; font-weight: 600; color: #5C5C5C; display: block; margin: 10px 0 4px; }
-  input[type=text], input[type=number] {
+  input[type=text], input[type=number], input[type=date], input[type=time] {
     width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #D5D5D5;
     background: #F7F7F7; font-size: 15px; font-family: inherit;
   }
@@ -114,6 +114,27 @@
   <div id="lista"></div>
 
   <h2 class="section">Recordatorios</h2>
+  <div class="card">
+    <label>Título</label>
+    <input type="text" id="r_titulo" placeholder="ej. Llamar a Juan Pérez" />
+
+    <div class="row2">
+      <div>
+        <label>Fecha</label>
+        <input type="date" id="r_fecha" />
+      </div>
+      <div>
+        <label>Hora</label>
+        <input type="time" id="r_hora" />
+      </div>
+    </div>
+
+    <label>Notas</label>
+    <input type="text" id="r_notas" placeholder="Notas (opcional)" />
+
+    <button class="primary" onclick="agregarRecordatorio()">Agregar recordatorio</button>
+    <div class="status" id="status-recordatorio"></div>
+  </div>
   <div id="lista-recordatorios"></div>
 </main>
 
@@ -192,6 +213,44 @@
     seleccionCombustible.length = 0;
     seleccionTransmision.length = 0;
     document.querySelectorAll(".pill.active").forEach(p => p.classList.remove("active"));
+  }
+
+  function mostrarStatusRecordatorio(msg, tipo) {
+    const el = document.getElementById("status-recordatorio");
+    el.textContent = msg;
+    el.className = "status " + (tipo || "");
+    if (tipo === "ok") setTimeout(() => { el.textContent = ""; }, 3000);
+  }
+
+  async function agregarRecordatorio() {
+    const titulo = document.getElementById("r_titulo").value.trim();
+    const fecha = document.getElementById("r_fecha").value;
+    const hora = document.getElementById("r_hora").value || "09:00";
+    if (!titulo || !fecha) {
+      mostrarStatusRecordatorio("Completa al menos el título y la fecha.", "err");
+      return;
+    }
+    const recordatorio = {
+      id: uuid(),
+      titulo,
+      fecha_hora: `${fecha}T${hora}:00`,
+      notas: document.getElementById("r_notas").value.trim(),
+      hecho: false,
+      notificado: false,
+    };
+    try {
+      const resp = await fetch(`${FIREBASE_URL}/recordatorios/${recordatorio.id}.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(recordatorio),
+      });
+      if (!resp.ok) throw new Error("Firebase respondió " + resp.status);
+      mostrarStatusRecordatorio("Recordatorio agregado ✓", "ok");
+      ["r_titulo", "r_fecha", "r_hora", "r_notas"].forEach(id => { document.getElementById(id).value = ""; });
+      cargarRecordatorios();
+    } catch (e) {
+      mostrarStatusRecordatorio("No se pudo guardar. Revisa tu conexión o la configuración de Firebase.", "err");
+    }
   }
 
   async function cargarClientes() {
