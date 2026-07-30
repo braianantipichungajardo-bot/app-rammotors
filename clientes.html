@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Clientes · RAM Motors</title>
+<style>
+  /* ============================================================
+     CONFIGURACIÓN: pegá acá la misma URL de Firebase que pusiste
+     en clientes_tab.py (FIREBASE_URL).
+  ============================================================= */
+</style>
+</head>
+<body>
+<script>
+  const FIREBASE_URL = "https://rammotors-clientes-default-rtdb.firebaseio.com"; // <-- pegar acá también
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, 'Segoe UI', sans-serif;
+    background: #F2F2F2; color: #0A0A0A;
+  }
+  header {
+    background: #0A0A0A; color: #fff; padding: 18px 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  header .mark {
+    width: 34px; height: 34px; border-radius: 8px; background: #C8102E;
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px;
+  }
+  header h1 { font-size: 16px; margin: 0; }
+  main { padding: 16px; max-width: 640px; margin: 0 auto; }
+  .card { background: #fff; border: 1px solid #DEDEDE; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  label { font-size: 12px; font-weight: 600; color: #5C5C5C; display: block; margin: 10px 0 4px; }
+  input[type=text], input[type=number] {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #D5D5D5;
+    background: #F7F7F7; font-size: 15px; font-family: inherit;
+  }
+  .row2 { display: flex; gap: 10px; }
+  .row2 > div { flex: 1; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .pill {
+    padding: 8px 14px; border-radius: 999px; border: 1px solid #D5D5D5; background: #F7F7F7;
+    font-size: 13px; cursor: pointer; user-select: none;
+  }
+  .pill.active { background: #0A0A0A; border-color: #0A0A0A; color: #fff; }
+  button.primary {
+    width: 100%; margin-top: 16px; background: #0A0A0A; color: #fff; border: none;
+    border-radius: 8px; padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  .status { font-size: 13px; margin-top: 10px; text-align: center; min-height: 18px; }
+  .status.ok { color: #2E7D32; }
+  .status.err { color: #C8102E; }
+  .cliente-item { background: #fff; border: 1px solid #DEDEDE; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+  .cliente-item .nombre { font-weight: 700; }
+  .cliente-item .detalle { font-size: 13px; color: #5C5C5C; margin-top: 2px; }
+  h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #5C5C5C; margin: 22px 0 10px; }
+</style>
+
+<header>
+  <div class="mark">AV</div>
+  <h1>Clientes · Agenda de Ventas</h1>
+</header>
+
+<main>
+  <div class="card">
+    <label>Nombre del cliente</label>
+    <input type="text" id="nombre" placeholder="Nombre" />
+
+    <label>Teléfono</label>
+    <input type="text" id="telefono" placeholder="Teléfono" />
+
+    <label>Marcas (separadas por coma)</label>
+    <input type="text" id="marcas" placeholder="ej. Toyota, Honda" />
+
+    <label>Modelos (separados por coma)</label>
+    <input type="text" id="modelos" placeholder="ej. Corolla, Civic" />
+
+    <label>Combustible</label>
+    <div class="pills" id="pills-combustible"></div>
+
+    <label>Transmisión</label>
+    <div class="pills" id="pills-transmision"></div>
+
+    <div class="row2">
+      <div>
+        <label>Precio mínimo</label>
+        <input type="number" id="pmin" placeholder="$ mínimo" />
+      </div>
+      <div>
+        <label>Precio máximo</label>
+        <input type="number" id="pmax" placeholder="$ máximo" />
+      </div>
+    </div>
+
+    <label>Notas</label>
+    <input type="text" id="notas" placeholder="Color, condiciones, etc." />
+
+    <button class="primary" onclick="agregarCliente()">Agregar cliente</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <h2 class="section">Clientes registrados</h2>
+  <div id="lista"></div>
+</main>
+
+<script>
+  const COMBUSTIBLES = ["Bencina", "Diésel", "Híbrido", "Eléctrico", "GLP"];
+  const TRANSMISIONES = ["Manual", "Automática"];
+  let seleccionCombustible = [];
+  let seleccionTransmision = [];
+
+  function crearPills(contenedorId, opciones, seleccion) {
+    const cont = document.getElementById(contenedorId);
+    opciones.forEach((opt) => {
+      const btn = document.createElement("div");
+      btn.className = "pill";
+      btn.textContent = opt;
+      btn.onclick = () => {
+        const i = seleccion.indexOf(opt);
+        if (i >= 0) seleccion.splice(i, 1); else seleccion.push(opt);
+        btn.classList.toggle("active");
+      };
+      cont.appendChild(btn);
+    });
+  }
+  crearPills("pills-combustible", COMBUSTIBLES, seleccionCombustible);
+  crearPills("pills-transmision", TRANSMISIONES, seleccionTransmision);
+
+  function uuid() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    return "id-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+  }
+
+  function mostrarStatus(msg, tipo) {
+    const el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = "status " + (tipo || "");
+    if (tipo === "ok") setTimeout(() => { el.textContent = ""; }, 3000);
+  }
+
+  async function agregarCliente() {
+    const nombre = document.getElementById("nombre").value.trim();
+    const telefono = document.getElementById("telefono").value.trim();
+    if (!nombre || !telefono) {
+      mostrarStatus("Completa al menos el nombre y el teléfono.", "err");
+      return;
+    }
+    const cliente = {
+      id: uuid(),
+      nombre, telefono,
+      marcas: document.getElementById("marcas").value.split(",").map(s => s.trim()).filter(Boolean),
+      modelos: document.getElementById("modelos").value.split(",").map(s => s.trim()).filter(Boolean),
+      combustible: [...seleccionCombustible],
+      transmision: [...seleccionTransmision],
+      precio_min: document.getElementById("pmin").value,
+      precio_max: document.getElementById("pmax").value,
+      notas: document.getElementById("notas").value.trim(),
+    };
+    try {
+      const resp = await fetch(`${FIREBASE_URL}/clientes/${cliente.id}.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cliente),
+      });
+      if (!resp.ok) throw new Error("Firebase respondió " + resp.status);
+      mostrarStatus("Cliente agregado ✓", "ok");
+      limpiarFormulario();
+      cargarClientes();
+    } catch (e) {
+      mostrarStatus("No se pudo guardar. Revisa tu conexión o la configuración de Firebase.", "err");
+    }
+  }
+
+  function limpiarFormulario() {
+    ["nombre", "telefono", "marcas", "modelos", "pmin", "pmax", "notas"].forEach(id => {
+      document.getElementById(id).value = "";
+    });
+    seleccionCombustible.length = 0;
+    seleccionTransmision.length = 0;
+    document.querySelectorAll(".pill.active").forEach(p => p.classList.remove("active"));
+  }
+
+  async function cargarClientes() {
+    const cont = document.getElementById("lista");
+    try {
+      const resp = await fetch(`${FIREBASE_URL}/clientes.json`);
+      const data = await resp.json();
+      const clientes = data ? Object.values(data) : [];
+      if (!clientes.length) {
+        cont.innerHTML = '<p style="color:#8A8A8A;font-size:14px;">Aún no hay clientes registrados.</p>';
+        return;
+      }
+      cont.innerHTML = clientes.map(c => `
+        <div class="cliente-item">
+          <div class="nombre">${c.nombre || ""}</div>
+          <div class="detalle">${c.telefono || ""}</div>
+          <div class="detalle">
+            ${(c.marcas || []).join(", ") || "cualquiera"} · ${(c.modelos || []).join(", ") || "cualquiera"}
+            ${(c.combustible || []).length ? " · " + c.combustible.join(", ") : ""}
+            ${(c.transmision || []).length ? " · " + c.transmision.join(", ") : ""}
+          </div>
+        </div>
+      `).join("");
+    } catch (e) {
+      cont.innerHTML = '<p style="color:#C8102E;font-size:14px;">No se pudo cargar la lista. Revisa tu conexión.</p>';
+    }
+  }
+
+  cargarClientes();
+</script>
+</body>
+</html>
