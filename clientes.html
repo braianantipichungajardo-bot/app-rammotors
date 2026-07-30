@@ -56,6 +56,15 @@
   .cliente-item .nombre { font-weight: 700; }
   .cliente-item .detalle { font-size: 13px; color: #5C5C5C; margin-top: 2px; }
   h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #5C5C5C; margin: 22px 0 10px; }
+  .recordatorio-item { background: #fff; border: 1px solid #DEDEDE; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+  .recordatorio-item .titulo { font-weight: 700; }
+  .recordatorio-item .fecha { font-size: 13px; color: #5C5C5C; margin-top: 2px; }
+  .recordatorio-item .fecha.vencido { color: #C8102E; font-weight: 600; }
+  .recordatorio-item .notas { font-size: 13px; color: #5C5C5C; margin-top: 2px; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-left: 6px; }
+  .badge.hecho { background: #E5E5E5; color: #5C5C5C; }
+  .badge.vencido { background: #FBE1E5; color: #C8102E; }
+  .badge.pendiente { background: #EDEDED; color: #2A2A2A; }
 </style>
 
 <header>
@@ -103,6 +112,9 @@
 
   <h2 class="section">Clientes registrados</h2>
   <div id="lista"></div>
+
+  <h2 class="section">Recordatorios</h2>
+  <div id="lista-recordatorios"></div>
 </main>
 
 <script>
@@ -208,7 +220,40 @@
     }
   }
 
+  async function cargarRecordatorios() {
+    const cont = document.getElementById("lista-recordatorios");
+    try {
+      const resp = await fetch(`${FIREBASE_URL}/recordatorios.json`);
+      const data = await resp.json();
+      let recordatorios = data ? Object.values(data) : [];
+      if (!recordatorios.length) {
+        cont.innerHTML = '<p style="color:#8A8A8A;font-size:14px;">No hay recordatorios por ahora.</p>';
+        return;
+      }
+      recordatorios.sort((a, b) => (a.fecha_hora || "").localeCompare(b.fecha_hora || ""));
+      const ahora = new Date();
+      cont.innerHTML = recordatorios.map(r => {
+        const dt = r.fecha_hora ? new Date(r.fecha_hora) : null;
+        const vencido = dt && !r.hecho && dt < ahora;
+        const fechaTexto = dt ? dt.toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" }) +
+          " · " + dt.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : "";
+        const estado = r.hecho ? '<span class="badge hecho">Hecho</span>' :
+          (vencido ? '<span class="badge vencido">Vencido</span>' : '<span class="badge pendiente">Pendiente</span>');
+        return `
+          <div class="recordatorio-item">
+            <div class="titulo">${r.titulo || ""} ${estado}</div>
+            <div class="fecha ${vencido ? "vencido" : ""}">${fechaTexto}</div>
+            ${r.notas ? `<div class="notas">${r.notas}</div>` : ""}
+          </div>
+        `;
+      }).join("");
+    } catch (e) {
+      cont.innerHTML = '<p style="color:#C8102E;font-size:14px;">No se pudo cargar la lista. Revisa tu conexión.</p>';
+    }
+  }
+
   cargarClientes();
+  cargarRecordatorios();
 </script>
 </body>
 </html>
