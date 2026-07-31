@@ -55,6 +55,10 @@
   .cliente-item { background: #fff; border: 1px solid #DEDEDE; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
   .cliente-item .nombre { font-weight: 700; }
   .cliente-item .detalle { font-size: 13px; color: #5C5C5C; margin-top: 2px; }
+  .item-acciones { display: flex; gap: 8px; margin-top: 10px; }
+  .item-acciones button { flex: 1; background: #F7F7F7; border: 1px solid #D5D5D5; color: #2A2A2A;
+    font-size: 12.5px; font-weight: 700; padding: 8px; border-radius: 8px; }
+  .item-acciones button.danger { color: #e50000; border-color: #F3C6CE; }
   h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #5C5C5C; margin: 22px 0 10px; }
   .recordatorio-item { background: #fff; border: 1px solid #DEDEDE; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
   .recordatorio-item .titulo { font-weight: 700; }
@@ -103,10 +107,21 @@
       </div>
     </div>
 
+    <div class="row2">
+      <div>
+        <label>Año mínimo</label>
+        <input type="number" id="anioMin" placeholder="ej. 2018" />
+      </div>
+      <div>
+        <label>Año máximo</label>
+        <input type="number" id="anioMax" placeholder="ej. 2023" />
+      </div>
+    </div>
+
     <label>Notas</label>
     <input type="text" id="notas" placeholder="Color, condiciones, etc." />
 
-    <button class="primary" onclick="agregarCliente()">Agregar cliente</button>
+    <button class="primary" id="btnAgregarCliente" onclick="agregarCliente()">Agregar cliente</button>
     <div class="status" id="status"></div>
   </div>
 
@@ -173,6 +188,9 @@
     if (tipo === "ok") setTimeout(() => { el.textContent = ""; }, 3000);
   }
 
+  let clientesActuales = [];
+  let edicionClienteId = null;
+
   async function agregarCliente() {
     const nombre = document.getElementById("nombre").value.trim();
     const telefono = document.getElementById("telefono").value.trim();
@@ -181,7 +199,7 @@
       return;
     }
     const cliente = {
-      id: uuid(),
+      id: edicionClienteId || uuid(),
       nombre, telefono,
       marcas: document.getElementById("marcas").value.split(",").map(s => s.trim()).filter(Boolean),
       modelos: document.getElementById("modelos").value.split(",").map(s => s.trim()).filter(Boolean),
@@ -189,6 +207,8 @@
       transmision: [...seleccionTransmision],
       precio_min: document.getElementById("pmin").value,
       precio_max: document.getElementById("pmax").value,
+      anio_min: document.getElementById("anioMin").value,
+      anio_max: document.getElementById("anioMax").value,
       notas: document.getElementById("notas").value.trim(),
     };
     try {
@@ -198,8 +218,8 @@
         body: JSON.stringify(cliente),
       });
       if (!resp.ok) throw new Error("Firebase respondió " + resp.status);
-      mostrarStatus("Cliente agregado ✓", "ok");
-      limpiarFormulario();
+      mostrarStatus(edicionClienteId ? "Cambios guardados ✓" : "Cliente agregado ✓", "ok");
+      cancelarEdicionCliente();
       cargarClientes();
     } catch (e) {
       mostrarStatus("No se pudo guardar. Revisa tu conexión o la configuración de Firebase.", "err");
@@ -207,12 +227,64 @@
   }
 
   function limpiarFormulario() {
-    ["nombre", "telefono", "marcas", "modelos", "pmin", "pmax", "notas"].forEach(id => {
+    ["nombre", "telefono", "marcas", "modelos", "pmin", "pmax", "anioMin", "anioMax", "notas"].forEach(id => {
       document.getElementById(id).value = "";
     });
     seleccionCombustible.length = 0;
     seleccionTransmision.length = 0;
     document.querySelectorAll(".pill.active").forEach(p => p.classList.remove("active"));
+  }
+
+  function cancelarEdicionCliente() {
+    limpiarFormulario();
+    edicionClienteId = null;
+    document.getElementById("btnAgregarCliente").textContent = "Agregar cliente";
+    const cancelBtn = document.getElementById("btnCancelarEdicionCliente");
+    if (cancelBtn) cancelBtn.style.display = "none";
+  }
+
+  function editarCliente(id) {
+    const c = clientesActuales.find(x => x.id === id);
+    if (!c) return;
+    edicionClienteId = id;
+    document.getElementById("nombre").value = c.nombre || "";
+    document.getElementById("telefono").value = c.telefono || "";
+    document.getElementById("marcas").value = (c.marcas || []).join(", ");
+    document.getElementById("modelos").value = (c.modelos || []).join(", ");
+    document.getElementById("pmin").value = c.precio_min || "";
+    document.getElementById("pmax").value = c.precio_max || "";
+    document.getElementById("anioMin").value = c.anio_min || "";
+    document.getElementById("anioMax").value = c.anio_max || "";
+    document.getElementById("notas").value = c.notas || "";
+    seleccionCombustible.length = 0;
+    (c.combustible || []).forEach(v => seleccionCombustible.push(v));
+    seleccionTransmision.length = 0;
+    (c.transmision || []).forEach(v => seleccionTransmision.push(v));
+    document.querySelectorAll("#pills-combustible .pill").forEach(el => el.classList.toggle("active", seleccionCombustible.includes(el.textContent)));
+    document.querySelectorAll("#pills-transmision .pill").forEach(el => el.classList.toggle("active", seleccionTransmision.includes(el.textContent)));
+    document.getElementById("btnAgregarCliente").textContent = "Guardar cambios";
+    let cancelBtn = document.getElementById("btnCancelarEdicionCliente");
+    if (!cancelBtn) {
+      cancelBtn = document.createElement("button");
+      cancelBtn.id = "btnCancelarEdicionCliente";
+      cancelBtn.textContent = "Cancelar edición";
+      cancelBtn.style.cssText = "width:100%;margin-top:8px;background:none;border:1px solid #D5D5D5;color:#5C5C5C;font-size:13px;font-weight:700;padding:10px;border-radius:8px;";
+      cancelBtn.onclick = cancelarEdicionCliente;
+      document.getElementById("btnAgregarCliente").insertAdjacentElement("afterend", cancelBtn);
+    }
+    cancelBtn.style.display = "block";
+    document.getElementById("btnAgregarCliente").closest(".card").scrollIntoView({behavior: "smooth", block: "start"});
+  }
+
+  async function eliminarCliente(id) {
+    if (!confirm("¿Eliminar este cliente?")) return;
+    try {
+      await fetch(`${FIREBASE_URL}/clientes/${id}.json`, { method: "DELETE" });
+      if (edicionClienteId === id) cancelarEdicionCliente();
+      cargarClientes();
+    } catch (e) {
+      alert("No se pudo eliminar. Revisa tu conexión.");
+    }
   }
 
   function mostrarStatusRecordatorio(msg, tipo) {
@@ -258,12 +330,12 @@
     try {
       const resp = await fetch(`${FIREBASE_URL}/clientes.json`);
       const data = await resp.json();
-      const clientes = data ? Object.values(data) : [];
-      if (!clientes.length) {
+      clientesActuales = data ? Object.values(data) : [];
+      if (!clientesActuales.length) {
         cont.innerHTML = '<p style="color:#8A8A8A;font-size:14px;">Aún no hay clientes registrados.</p>';
         return;
       }
-      cont.innerHTML = clientes.map(c => `
+      cont.innerHTML = clientesActuales.map(c => `
         <div class="cliente-item">
           <div class="nombre">${c.nombre || ""}</div>
           <div class="detalle">${c.telefono || ""}</div>
@@ -271,6 +343,11 @@
             ${(c.marcas || []).join(", ") || "cualquiera"} · ${(c.modelos || []).join(", ") || "cualquiera"}
             ${(c.combustible || []).length ? " · " + c.combustible.join(", ") : ""}
             ${(c.transmision || []).length ? " · " + c.transmision.join(", ") : ""}
+            ${(c.anio_min || c.anio_max) ? " · " + (c.anio_min && c.anio_max ? c.anio_min + "–" + c.anio_max : (c.anio_min ? "desde " + c.anio_min : "hasta " + c.anio_max)) : ""}
+          </div>
+          <div class="item-acciones">
+            <button onclick="editarCliente('${c.id}')">✏️ Editar</button>
+            <button onclick="eliminarCliente('${c.id}')" class="danger">🗑 Eliminar</button>
           </div>
         </div>
       `).join("");
