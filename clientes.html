@@ -26,7 +26,7 @@
     display: flex; align-items: center; gap: 10px;
   }
   header .mark {
-    width: 34px; height: 34px; border-radius: 8px; background: #C8102E;
+    width: 34px; height: 34px; border-radius: 8px; background: #e50000;
     display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px;
   }
   header h1 { font-size: 16px; margin: 0; }
@@ -51,7 +51,7 @@
   }
   .status { font-size: 13px; margin-top: 10px; text-align: center; min-height: 18px; }
   .status.ok { color: #2E7D32; }
-  .status.err { color: #C8102E; }
+  .status.err { color: #e50000; }
   .cliente-item { background: #fff; border: 1px solid #DEDEDE; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
   .cliente-item .nombre { font-weight: 700; }
   .cliente-item .detalle { font-size: 13px; color: #5C5C5C; margin-top: 2px; }
@@ -59,11 +59,11 @@
   .recordatorio-item { background: #fff; border: 1px solid #DEDEDE; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
   .recordatorio-item .titulo { font-weight: 700; }
   .recordatorio-item .fecha { font-size: 13px; color: #5C5C5C; margin-top: 2px; }
-  .recordatorio-item .fecha.vencido { color: #C8102E; font-weight: 600; }
+  .recordatorio-item .fecha.vencido { color: #e50000; font-weight: 600; }
   .recordatorio-item .notas { font-size: 13px; color: #5C5C5C; margin-top: 2px; }
   .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-left: 6px; }
   .badge.hecho { background: #E5E5E5; color: #5C5C5C; }
-  .badge.vencido { background: #FBE1E5; color: #C8102E; }
+  .badge.vencido { background: #FBE1E5; color: #e50000; }
   .badge.pendiente { background: #EDEDED; color: #2A2A2A; }
 </style>
 
@@ -275,7 +275,7 @@
         </div>
       `).join("");
     } catch (e) {
-      cont.innerHTML = '<p style="color:#C8102E;font-size:14px;">No se pudo cargar la lista. Revisa tu conexión.</p>';
+      cont.innerHTML = '<p style="color:#e50000;font-size:14px;">No se pudo cargar la lista. Revisa tu conexión.</p>';
     }
   }
 
@@ -307,7 +307,7 @@
         `;
       }).join("");
     } catch (e) {
-      cont.innerHTML = '<p style="color:#C8102E;font-size:14px;">No se pudo cargar la lista. Revisa tu conexión.</p>';
+      cont.innerHTML = '<p style="color:#e50000;font-size:14px;">No se pudo cargar la lista. Revisa tu conexión.</p>';
     }
   }
 
