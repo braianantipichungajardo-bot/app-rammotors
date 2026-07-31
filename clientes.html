@@ -118,6 +118,9 @@
       </div>
     </div>
 
+    <label>Kilometraje máximo</label>
+    <input type="number" id="kmMax" placeholder="ej. 60000" />
+
     <label>Notas</label>
     <input type="text" id="notas" placeholder="Color, condiciones, etc." />
 
@@ -209,6 +212,7 @@
       precio_max: document.getElementById("pmax").value,
       anio_min: document.getElementById("anioMin").value,
       anio_max: document.getElementById("anioMax").value,
+      km_max: document.getElementById("kmMax").value,
       notas: document.getElementById("notas").value.trim(),
     };
     try {
@@ -227,7 +231,7 @@
   }
 
   function limpiarFormulario() {
-    ["nombre", "telefono", "marcas", "modelos", "pmin", "pmax", "anioMin", "anioMax", "notas"].forEach(id => {
+    ["nombre", "telefono", "marcas", "modelos", "pmin", "pmax", "anioMin", "anioMax", "kmMax", "notas"].forEach(id => {
       document.getElementById(id).value = "";
     });
     seleccionCombustible.length = 0;
@@ -255,6 +259,7 @@
     document.getElementById("pmax").value = c.precio_max || "";
     document.getElementById("anioMin").value = c.anio_min || "";
     document.getElementById("anioMax").value = c.anio_max || "";
+    document.getElementById("kmMax").value = c.km_max || "";
     document.getElementById("notas").value = c.notas || "";
     seleccionCombustible.length = 0;
     (c.combustible || []).forEach(v => seleccionCombustible.push(v));
@@ -344,6 +349,7 @@
             ${(c.combustible || []).length ? " · " + c.combustible.join(", ") : ""}
             ${(c.transmision || []).length ? " · " + c.transmision.join(", ") : ""}
             ${(c.anio_min || c.anio_max) ? " · " + (c.anio_min && c.anio_max ? c.anio_min + "–" + c.anio_max : (c.anio_min ? "desde " + c.anio_min : "hasta " + c.anio_max)) : ""}
+            ${c.km_max ? " · hasta " + c.km_max + " km" : ""}
           </div>
           <div class="item-acciones">
             <button onclick="editarCliente('${c.id}')">✏️ Editar</button>
