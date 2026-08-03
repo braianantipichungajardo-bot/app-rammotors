@@ -16,32 +16,54 @@
   const FIREBASE_URL = "https://rammotors-clientes-default-rtdb.firebaseio.com"; // <-- pegar acá también
   const FIREBASE_API_KEY = "AIzaSyDd0uv508MD_u4Ga06XVtxnw9N28E3FCOc"; // Clave de API web (Configuración del proyecto > General)
 
-  let _idToken = null;
-  let _idTokenExpira = 0;
-
-  async function obtenerIdToken(){
-    const ahora = Date.now() / 1000;
-    if (_idToken && ahora < _idTokenExpira - 60) return _idToken;
-    try{
-      const resp = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({returnSecureToken: true}),
-      });
-      const data = await resp.json();
-      _idToken = data.idToken;
-      _idTokenExpira = ahora + Number(data.expiresIn || 3600);
-      return _idToken;
-    }catch(e){
-      return null;
-    }
+  function obtenerIdToken(){
+    const expira = Number(localStorage.getItem("rm_auth_expira") || 0);
+    if (Date.now() / 1000 < expira - 60) return localStorage.getItem("rm_auth_token");
+    return null;
   }
 
   async function urlFirebase(ruta){
-    const token = await obtenerIdToken();
+    const token = obtenerIdToken();
     return token ? `${FIREBASE_URL}${ruta}?auth=${token}` : `${FIREBASE_URL}${ruta}`;
   }
+
+  async function iniciarSesion(email, password){
+    const resp = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({email, password, returnSecureToken: true}),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error && data.error.message ? data.error.message : "Error al iniciar sesión");
+    const ahora = Date.now() / 1000;
+    localStorage.setItem("rm_auth_token", data.idToken);
+    localStorage.setItem("rm_auth_expira", String(ahora + Number(data.expiresIn || 3600)));
+  }
+
+  function cerrarSesion(){
+    localStorage.removeItem("rm_auth_token");
+    localStorage.removeItem("rm_auth_expira");
+    location.reload();
+  }
 </script>
+<style>
+  #loginOverlay{position:fixed;inset:0;background:#0a0a0a;z-index:100;display:flex;
+    align-items:center;justify-content:center;padding:20px;font-family:-apple-system,'Segoe UI',sans-serif;}
+  #loginOverlay .caja{width:100%;max-width:340px;background:#1c1c1c;border:1px solid #333;
+    border-radius:16px;padding:26px 22px;}
+  #loginOverlay .marca{width:52px;height:52px;border-radius:14px;background:#e50000;color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;margin:0 auto 14px;}
+  #loginOverlay h1{color:#fff;font-size:17px;text-align:center;margin:0 0 20px;}
+  #loginOverlay label{color:#9a9a9a;font-size:12px;font-weight:700;display:block;margin:12px 0 4px;}
+  #loginOverlay input{width:100%;background:#141414;border:1px solid #333;border-radius:9px;
+    padding:11px 12px;color:#fff;font-size:14.5px;box-sizing:border-box;}
+  #loginOverlay input:focus{outline:none;border-color:#e50000;}
+  #loginOverlay button{width:100%;margin-top:18px;background:#e50000;border:none;color:#fff;
+    font-weight:700;font-size:14.5px;padding:12px;border-radius:9px;}
+  #loginOverlay .error{color:#e50000;font-size:12.5px;text-align:center;margin-top:10px;min-height:16px;}
+  #btnCerrarSesion{position:fixed;bottom:10px;right:10px;z-index:90;background:#1c1c1c;border:1px solid #333;
+    color:#9a9a9a;font-size:11px;padding:6px 10px;border-radius:8px;}
+</style>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -97,6 +119,20 @@
   .badge.vencido { background: #FBE1E5; color: #e50000; }
   .badge.pendiente { background: #EDEDED; color: #2A2A2A; }
 </style>
+
+<div id="loginOverlay">
+  <div class="caja">
+    <div class="marca">AV</div>
+    <h1>Iniciar sesión</h1>
+    <label>Usuario</label>
+    <input type="email" id="loginEmail" placeholder="usuario@rammotors.cl" autocomplete="username" />
+    <label>Contraseña</label>
+    <input type="password" id="loginPassword" placeholder="Contraseña" autocomplete="current-password" />
+    <button id="btnLogin">Entrar</button>
+    <div class="error" id="loginError"></div>
+  </div>
+</div>
+<button id="btnCerrarSesion" style="display:none;" onclick="cerrarSesion()">Cerrar sesión</button>
 
 <header>
   <div class="mark">AV</div>
@@ -421,8 +457,41 @@
     }
   }
 
-  cargarClientes();
-  cargarRecordatorios();
+  function iniciarApp(){
+    document.getElementById("loginOverlay").style.display = "none";
+    document.getElementById("btnCerrarSesion").style.display = "block";
+    cargarClientes();
+    cargarRecordatorios();
+  }
+
+  function mostrarErrorLogin(msg){
+    document.getElementById("loginError").textContent = msg;
+  }
+
+  document.getElementById("btnLogin").addEventListener("click", async () => {
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value;
+    if (!email || !password){
+      mostrarErrorLogin("Completa usuario y contraseña.");
+      return;
+    }
+    mostrarErrorLogin("Entrando...");
+    try{
+      await iniciarSesion(email, password);
+      mostrarErrorLogin("");
+      iniciarApp();
+    }catch(e){
+      mostrarErrorLogin("Usuario o contraseña incorrectos.");
+    }
+  });
+  document.getElementById("loginPassword").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btnLogin").click();
+  });
+
+  // Si ya había una sesión guardada (no venció todavía), entra directo sin pedir login de nuevo.
+  if (obtenerIdToken()){
+    iniciarApp();
+  }
 </script>
 </body>
 </html>
