@@ -14,6 +14,33 @@
 <body>
 <script>
   const FIREBASE_URL = "https://rammotors-clientes-default-rtdb.firebaseio.com"; // <-- pegar acá también
+  const FIREBASE_API_KEY = "AIzaSyDd0uv508MD_u4Ga06XVtxnw9N28E3FCOc"; // Clave de API web (Configuración del proyecto > General)
+
+  let _idToken = null;
+  let _idTokenExpira = 0;
+
+  async function obtenerIdToken(){
+    const ahora = Date.now() / 1000;
+    if (_idToken && ahora < _idTokenExpira - 60) return _idToken;
+    try{
+      const resp = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({returnSecureToken: true}),
+      });
+      const data = await resp.json();
+      _idToken = data.idToken;
+      _idTokenExpira = ahora + Number(data.expiresIn || 3600);
+      return _idToken;
+    }catch(e){
+      return null;
+    }
+  }
+
+  async function urlFirebase(ruta){
+    const token = await obtenerIdToken();
+    return token ? `${FIREBASE_URL}${ruta}?auth=${token}` : `${FIREBASE_URL}${ruta}`;
+  }
 </script>
 <style>
   * { box-sizing: border-box; }
@@ -216,7 +243,7 @@
       notas: document.getElementById("notas").value.trim(),
     };
     try {
-      const resp = await fetch(`${FIREBASE_URL}/clientes/${cliente.id}.json`, {
+      const resp = await fetch(await urlFirebase(`/clientes/${cliente.id}.json`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(cliente),
@@ -284,7 +311,7 @@
   async function eliminarCliente(id) {
     if (!confirm("¿Eliminar este cliente?")) return;
     try {
-      await fetch(`${FIREBASE_URL}/clientes/${id}.json`, { method: "DELETE" });
+      await fetch(await urlFirebase(`/clientes/${id}.json`), { method: "DELETE" });
       if (edicionClienteId === id) cancelarEdicionCliente();
       cargarClientes();
     } catch (e) {
@@ -316,7 +343,7 @@
       notificado: false,
     };
     try {
-      const resp = await fetch(`${FIREBASE_URL}/recordatorios/${recordatorio.id}.json`, {
+      const resp = await fetch(await urlFirebase(`/recordatorios/${recordatorio.id}.json`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(recordatorio),
@@ -333,7 +360,7 @@
   async function cargarClientes() {
     const cont = document.getElementById("lista");
     try {
-      const resp = await fetch(`${FIREBASE_URL}/clientes.json`);
+      const resp = await fetch(await urlFirebase(`/clientes.json`));
       const data = await resp.json();
       clientesActuales = data ? Object.values(data) : [];
       if (!clientesActuales.length) {
@@ -365,7 +392,7 @@
   async function cargarRecordatorios() {
     const cont = document.getElementById("lista-recordatorios");
     try {
-      const resp = await fetch(`${FIREBASE_URL}/recordatorios.json`);
+      const resp = await fetch(await urlFirebase(`/recordatorios.json`));
       const data = await resp.json();
       let recordatorios = data ? Object.values(data) : [];
       if (!recordatorios.length) {
