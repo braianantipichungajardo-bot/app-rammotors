@@ -82,7 +82,7 @@
   main { padding: 16px; max-width: 640px; margin: 0 auto; }
   .card { background: #fff; border: 1px solid #DEDEDE; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
   label { font-size: 12px; font-weight: 600; color: #5C5C5C; display: block; margin: 10px 0 4px; }
-  input[type=text], input[type=number], input[type=date], input[type=time] {
+  input[type=text], input[type=number], input[type=date], input[type=time], input[type=email] {
     width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #D5D5D5;
     background: #F7F7F7; font-size: 15px; font-family: inherit;
   }
@@ -193,6 +193,36 @@
 
   <h2 class="section">Clientes registrados</h2>
   <div id="lista"></div>
+
+  <h2 class="section">Clientes cotizados</h2>
+  <div class="card">
+    <label>Nombre del cliente</label>
+    <input type="text" id="cotNombre2" placeholder="Nombre" />
+
+    <label>Teléfono</label>
+    <input type="text" id="cotTelefono2" placeholder="Teléfono" />
+
+    <div class="row2">
+      <div>
+        <label>RUT</label>
+        <input type="text" id="cotRut2" placeholder="12.345.678-9" />
+      </div>
+      <div>
+        <label>Email</label>
+        <input type="email" id="cotEmail2" placeholder="cliente@correo.cl" />
+      </div>
+    </div>
+
+    <label>Dirección</label>
+    <input type="text" id="cotDireccion2" placeholder="Calle, número, comuna" />
+
+    <label>Notas</label>
+    <input type="text" id="cotNotas2" placeholder="Notas (opcional)" />
+
+    <button class="primary" id="btnAgregarCotizado" onclick="agregarClienteCotizado()">Agregar cliente cotizado</button>
+    <div class="status" id="statusCotizado"></div>
+  </div>
+  <div id="listaCotizados"></div>
 
   <h2 class="section">Recordatorios</h2>
   <div class="card">
@@ -355,6 +385,150 @@
     }
   }
 
+  async function cargarClientes() {
+    const cont = document.getElementById("lista");
+    try {
+      const resp = await fetch(await urlFirebase(`/clientes.json`));
+      const data = await resp.json();
+      clientesActuales = data ? Object.values(data) : [];
+      if (!clientesActuales.length) {
+        cont.innerHTML = '<p style="color:#8A8A8A;font-size:14px;">Aún no hay clientes registrados.</p>';
+        return;
+      }
+      cont.innerHTML = clientesActuales.map(c => `
+        <div class="cliente-item">
+          <div class="nombre">${c.nombre || ""}</div>
+          <div class="detalle">${c.telefono || ""}</div>
+          <div class="detalle">
+            ${(c.marcas || []).join(", ") || "cualquiera"} · ${(c.modelos || []).join(", ") || "cualquiera"}
+            ${(c.combustible || []).length ? " · " + c.combustible.join(", ") : ""}
+            ${(c.transmision || []).length ? " · " + c.transmision.join(", ") : ""}
+            ${(c.anio_min || c.anio_max) ? " · " + (c.anio_min && c.anio_max ? c.anio_min + "–" + c.anio_max : (c.anio_min ? "desde " + c.anio_min : "hasta " + c.anio_max)) : ""}
+            ${c.km_max ? " · hasta " + c.km_max + " km" : ""}
+          </div>
+          <div class="item-acciones">
+            <button onclick="editarCliente('${c.id}')">✏️ Editar</button>
+            <button onclick="eliminarCliente('${c.id}')" class="danger">🗑 Eliminar</button>
+          </div>
+        </div>
+      `).join("");
+    } catch (e) {
+      cont.innerHTML = '<p style="color:#e50000;font-size:14px;">No se pudo cargar la lista. Revisa tu conexión.</p>';
+    }
+  }
+
+  function mostrarStatusCotizado(msg, tipo) {
+    const el = document.getElementById("statusCotizado");
+    el.textContent = msg;
+    el.className = "status " + (tipo || "");
+    if (tipo === "ok") setTimeout(() => { el.textContent = ""; }, 3000);
+  }
+
+  let clientesCotizadosActuales = [];
+  let edicionClienteCotizadoId = null;
+
+  async function agregarClienteCotizado() {
+    const nombre = document.getElementById("cotNombre2").value.trim();
+    const telefono = document.getElementById("cotTelefono2").value.trim();
+    if (!nombre || !telefono) {
+      mostrarStatusCotizado("Completa al menos el nombre y el teléfono.", "err");
+      return;
+    }
+    const cliente = {
+      id: edicionClienteCotizadoId || uuid(),
+      nombre, telefono,
+      rut: document.getElementById("cotRut2").value.trim(),
+      email: document.getElementById("cotEmail2").value.trim(),
+      direccion: document.getElementById("cotDireccion2").value.trim(),
+      notas: document.getElementById("cotNotas2").value.trim(),
+    };
+    try {
+      const resp = await fetch(await urlFirebase(`/clientes_cotizados/${cliente.id}.json`), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cliente),
+      });
+      if (!resp.ok) throw new Error("Firebase respondió " + resp.status);
+      mostrarStatusCotizado(edicionClienteCotizadoId ? "Cambios guardados ✓" : "Cliente agregado ✓", "ok");
+      cancelarEdicionClienteCotizado();
+      cargarClientesCotizados();
+    } catch (e) {
+      mostrarStatusCotizado("No se pudo guardar. Revisa tu conexión o la configuración de Firebase.", "err");
+    }
+  }
+
+  function cancelarEdicionClienteCotizado() {
+    ["cotNombre2", "cotTelefono2", "cotRut2", "cotEmail2", "cotDireccion2", "cotNotas2"].forEach(id => {
+      document.getElementById(id).value = "";
+    });
+    edicionClienteCotizadoId = null;
+    document.getElementById("btnAgregarCotizado").textContent = "Agregar cliente cotizado";
+    const cancelBtn = document.getElementById("btnCancelarEdicionCotizado");
+    if (cancelBtn) cancelBtn.style.display = "none";
+  }
+
+  function editarClienteCotizado(id) {
+    const c = clientesCotizadosActuales.find(x => x.id === id);
+    if (!c) return;
+    edicionClienteCotizadoId = id;
+    document.getElementById("cotNombre2").value = c.nombre || "";
+    document.getElementById("cotTelefono2").value = c.telefono || "";
+    document.getElementById("cotRut2").value = c.rut || "";
+    document.getElementById("cotEmail2").value = c.email || "";
+    document.getElementById("cotDireccion2").value = c.direccion || "";
+    document.getElementById("cotNotas2").value = c.notas || "";
+    document.getElementById("btnAgregarCotizado").textContent = "Guardar cambios";
+    let cancelBtn = document.getElementById("btnCancelarEdicionCotizado");
+    if (!cancelBtn) {
+      cancelBtn = document.createElement("button");
+      cancelBtn.id = "btnCancelarEdicionCotizado";
+      cancelBtn.textContent = "Cancelar edición";
+      cancelBtn.style.cssText = "width:100%;margin-top:8px;background:none;border:1px solid #D5D5D5;color:#5C5C5C;font-size:13px;font-weight:700;padding:10px;border-radius:8px;";
+      cancelBtn.onclick = cancelarEdicionClienteCotizado;
+      document.getElementById("btnAgregarCotizado").insertAdjacentElement("afterend", cancelBtn);
+    }
+    cancelBtn.style.display = "block";
+    document.getElementById("btnAgregarCotizado").closest(".card").scrollIntoView({behavior: "smooth", block: "start"});
+  }
+
+  async function eliminarClienteCotizado(id) {
+    if (!confirm("¿Eliminar este cliente cotizado?")) return;
+    try {
+      await fetch(await urlFirebase(`/clientes_cotizados/${id}.json`), { method: "DELETE" });
+      if (edicionClienteCotizadoId === id) cancelarEdicionClienteCotizado();
+      cargarClientesCotizados();
+    } catch (e) {
+      alert("No se pudo eliminar. Revisa tu conexión.");
+    }
+  }
+
+  async function cargarClientesCotizados() {
+    const cont = document.getElementById("listaCotizados");
+    try {
+      const resp = await fetch(await urlFirebase(`/clientes_cotizados.json`));
+      const data = await resp.json();
+      clientesCotizadosActuales = data ? Object.values(data) : [];
+      if (!clientesCotizadosActuales.length) {
+        cont.innerHTML = '<p style="color:#8A8A8A;font-size:14px;">Todavía no hay clientes cotizados.</p>';
+        return;
+      }
+      cont.innerHTML = clientesCotizadosActuales.map(c => `
+        <div class="cliente-item">
+          <div class="nombre">${c.nombre || ""}</div>
+          <div class="detalle">${c.telefono || ""}${c.email ? " · " + c.email : ""}</div>
+          ${c.direccion ? `<div class="detalle">${c.direccion}</div>` : ""}
+          ${c.notas ? `<div class="detalle">${c.notas}</div>` : ""}
+          <div class="item-acciones">
+            <button onclick="editarClienteCotizado('${c.id}')">✏️ Editar</button>
+            <button onclick="eliminarClienteCotizado('${c.id}')" class="danger">🗑 Eliminar</button>
+          </div>
+        </div>
+      `).join("");
+    } catch (e) {
+      cont.innerHTML = '<p style="color:#e50000;font-size:14px;">No se pudo cargar la lista. Revisa tu conexión.</p>';
+    }
+  }
+
   function mostrarStatusRecordatorio(msg, tipo) {
     const el = document.getElementById("status-recordatorio");
     el.textContent = msg;
@@ -390,38 +564,6 @@
       cargarRecordatorios();
     } catch (e) {
       mostrarStatusRecordatorio("No se pudo guardar. Revisa tu conexión o la configuración de Firebase.", "err");
-    }
-  }
-
-  async function cargarClientes() {
-    const cont = document.getElementById("lista");
-    try {
-      const resp = await fetch(await urlFirebase(`/clientes.json`));
-      const data = await resp.json();
-      clientesActuales = data ? Object.values(data) : [];
-      if (!clientesActuales.length) {
-        cont.innerHTML = '<p style="color:#8A8A8A;font-size:14px;">Aún no hay clientes registrados.</p>';
-        return;
-      }
-      cont.innerHTML = clientesActuales.map(c => `
-        <div class="cliente-item">
-          <div class="nombre">${c.nombre || ""}</div>
-          <div class="detalle">${c.telefono || ""}</div>
-          <div class="detalle">
-            ${(c.marcas || []).join(", ") || "cualquiera"} · ${(c.modelos || []).join(", ") || "cualquiera"}
-            ${(c.combustible || []).length ? " · " + c.combustible.join(", ") : ""}
-            ${(c.transmision || []).length ? " · " + c.transmision.join(", ") : ""}
-            ${(c.anio_min || c.anio_max) ? " · " + (c.anio_min && c.anio_max ? c.anio_min + "–" + c.anio_max : (c.anio_min ? "desde " + c.anio_min : "hasta " + c.anio_max)) : ""}
-            ${c.km_max ? " · hasta " + c.km_max + " km" : ""}
-          </div>
-          <div class="item-acciones">
-            <button onclick="editarCliente('${c.id}')">✏️ Editar</button>
-            <button onclick="eliminarCliente('${c.id}')" class="danger">🗑 Eliminar</button>
-          </div>
-        </div>
-      `).join("");
-    } catch (e) {
-      cont.innerHTML = '<p style="color:#e50000;font-size:14px;">No se pudo cargar la lista. Revisa tu conexión.</p>';
     }
   }
 
@@ -461,6 +603,7 @@
     document.getElementById("loginOverlay").style.display = "none";
     document.getElementById("btnCerrarSesion").style.display = "block";
     cargarClientes();
+    cargarClientesCotizados();
     cargarRecordatorios();
   }
 
