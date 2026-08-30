@@ -277,6 +277,15 @@
     return "id-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   }
 
+  // Convierte cualquier texto en algo seguro para insertar en el HTML — así, si alguien
+  // mete algo como "<script>" en el nombre o las notas de un cliente, se muestra tal cual
+  // como texto en vez de ejecutarse en el navegador de quien vea la lista después.
+  function escaparHtml(texto){
+    return String(texto ?? '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+  }
+
   function mostrarStatus(msg, tipo) {
     const el = document.getElementById("status");
     el.textContent = msg;
@@ -397,21 +406,27 @@
       }
       cont.innerHTML = clientesActuales.map(c => `
         <div class="cliente-item">
-          <div class="nombre">${c.nombre || ""}</div>
-          <div class="detalle">${c.telefono || ""}</div>
+          <div class="nombre">${escaparHtml(c.nombre)}</div>
+          <div class="detalle">${escaparHtml(c.telefono)}</div>
           <div class="detalle">
-            ${(c.marcas || []).join(", ") || "cualquiera"} · ${(c.modelos || []).join(", ") || "cualquiera"}
-            ${(c.combustible || []).length ? " · " + c.combustible.join(", ") : ""}
-            ${(c.transmision || []).length ? " · " + c.transmision.join(", ") : ""}
+            ${escaparHtml((c.marcas || []).join(", ") || "cualquiera")} · ${escaparHtml((c.modelos || []).join(", ") || "cualquiera")}
+            ${(c.combustible || []).length ? " · " + escaparHtml(c.combustible.join(", ")) : ""}
+            ${(c.transmision || []).length ? " · " + escaparHtml(c.transmision.join(", ")) : ""}
             ${(c.anio_min || c.anio_max) ? " · " + (c.anio_min && c.anio_max ? c.anio_min + "–" + c.anio_max : (c.anio_min ? "desde " + c.anio_min : "hasta " + c.anio_max)) : ""}
             ${c.km_max ? " · hasta " + c.km_max + " km" : ""}
           </div>
           <div class="item-acciones">
-            <button onclick="editarCliente('${c.id}')">✏️ Editar</button>
-            <button onclick="eliminarCliente('${c.id}')" class="danger">🗑 Eliminar</button>
+            <button data-editar-cliente="${escaparHtml(c.id)}">✏️ Editar</button>
+            <button data-eliminar-cliente="${escaparHtml(c.id)}" class="danger">🗑 Eliminar</button>
           </div>
         </div>
       `).join("");
+      cont.querySelectorAll("[data-editar-cliente]").forEach(btn => {
+        btn.addEventListener("click", () => editarCliente(btn.dataset.editarCliente));
+      });
+      cont.querySelectorAll("[data-eliminar-cliente]").forEach(btn => {
+        btn.addEventListener("click", () => eliminarCliente(btn.dataset.eliminarCliente));
+      });
     } catch (e) {
       cont.innerHTML = '<p style="color:#e50000;font-size:14px;">No se pudo cargar la lista. Revisa tu conexión.</p>';
     }
@@ -514,16 +529,22 @@
       }
       cont.innerHTML = clientesCotizadosActuales.map(c => `
         <div class="cliente-item">
-          <div class="nombre">${c.nombre || ""}</div>
-          <div class="detalle">${c.telefono || ""}${c.email ? " · " + c.email : ""}</div>
-          ${c.direccion ? `<div class="detalle">${c.direccion}</div>` : ""}
-          ${c.notas ? `<div class="detalle">${c.notas}</div>` : ""}
+          <div class="nombre">${escaparHtml(c.nombre)}</div>
+          <div class="detalle">${escaparHtml(c.telefono)}${c.email ? " · " + escaparHtml(c.email) : ""}</div>
+          ${c.direccion ? `<div class="detalle">${escaparHtml(c.direccion)}</div>` : ""}
+          ${c.notas ? `<div class="detalle">${escaparHtml(c.notas)}</div>` : ""}
           <div class="item-acciones">
-            <button onclick="editarClienteCotizado('${c.id}')">✏️ Editar</button>
-            <button onclick="eliminarClienteCotizado('${c.id}')" class="danger">🗑 Eliminar</button>
+            <button data-editar-cotizado="${escaparHtml(c.id)}">✏️ Editar</button>
+            <button data-eliminar-cotizado="${escaparHtml(c.id)}" class="danger">🗑 Eliminar</button>
           </div>
         </div>
       `).join("");
+      cont.querySelectorAll("[data-editar-cotizado]").forEach(btn => {
+        btn.addEventListener("click", () => editarClienteCotizado(btn.dataset.editarCotizado));
+      });
+      cont.querySelectorAll("[data-eliminar-cotizado]").forEach(btn => {
+        btn.addEventListener("click", () => eliminarClienteCotizado(btn.dataset.eliminarCotizado));
+      });
     } catch (e) {
       cont.innerHTML = '<p style="color:#e50000;font-size:14px;">No se pudo cargar la lista. Revisa tu conexión.</p>';
     }
@@ -588,9 +609,9 @@
           (vencido ? '<span class="badge vencido">Vencido</span>' : '<span class="badge pendiente">Pendiente</span>');
         return `
           <div class="recordatorio-item">
-            <div class="titulo">${r.titulo || ""} ${estado}</div>
+            <div class="titulo">${escaparHtml(r.titulo)} ${estado}</div>
             <div class="fecha ${vencido ? "vencido" : ""}">${fechaTexto}</div>
-            ${r.notas ? `<div class="notas">${r.notas}</div>` : ""}
+            ${r.notas ? `<div class="notas">${escaparHtml(r.notas)}</div>` : ""}
           </div>
         `;
       }).join("");
