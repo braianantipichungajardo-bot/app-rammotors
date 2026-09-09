@@ -404,10 +404,15 @@
         cont.innerHTML = '<p style="color:#8A8A8A;font-size:14px;">Aún no hay clientes registrados.</p>';
         return;
       }
-      cont.innerHTML = clientesActuales.map(c => `
+      cont.innerHTML = clientesActuales.map(c => {
+        const waDigits = (c.telefono || "").replace(/[^0-9]/g, "");
+        return `
         <div class="cliente-item">
           <div class="nombre">${escaparHtml(c.nombre)}</div>
-          <div class="detalle">${escaparHtml(c.telefono)}</div>
+          <div class="detalle">
+            ${escaparHtml(c.telefono)}
+            ${waDigits ? ` · <a href="https://wa.me/${waDigits}" target="_blank" style="color:#25D366;font-weight:700;text-decoration:none;">💬 Abrir WhatsApp ↗</a>` : ""}
+          </div>
           <div class="detalle">
             ${escaparHtml((c.marcas || []).join(", ") || "cualquiera")} · ${escaparHtml((c.modelos || []).join(", ") || "cualquiera")}
             ${(c.combustible || []).length ? " · " + escaparHtml(c.combustible.join(", ")) : ""}
@@ -420,7 +425,8 @@
             <button data-eliminar-cliente="${escaparHtml(c.id)}" class="danger">🗑 Eliminar</button>
           </div>
         </div>
-      `).join("");
+      `;
+      }).join("");
       cont.querySelectorAll("[data-editar-cliente]").forEach(btn => {
         btn.addEventListener("click", () => editarCliente(btn.dataset.editarCliente));
       });
